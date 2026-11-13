@@ -31,11 +31,11 @@ when drafting specs.
 | Agent | Lens | Shell | Notes |
 |-------|------|-------|-------|
 | `pm` | product value, spec quality | no | grades every spec |
-| `ux-critic` | usability, flows, a11y | no | user-facing items only |
+| `ux-critic` | usability, flows, a11y | no | user-facing items only; **pinned to a vision model** — drives the UI and analyzes screenshots |
 | `implementation-grader` | spec coverage w/ evidence | yes (tests) | runs every cycle |
 | `code-reviewer` | bugs, regressions | no | runs every cycle |
 | `security-analyst` | security; CVE lead | no | runs every cycle |
-| `demo-recorder` | demo artifacts | yes | end of run only |
+| `demo-recorder` | demo artifacts | yes | end of run only; **pinned to a vision model** — browser + TTS + ffmpeg for narrated demos |
 
 ## Phase 0 — Intake
 
@@ -78,7 +78,32 @@ Assemble the panel by routing:
 - **CVE**: `implementation-grader`, `code-reviewer`, `security-analyst`
   (lead — see below)
 
-Launch the panel members **in parallel** (background subagents). Each
+### Capability routing (before launching)
+
+Check each routed member's needs against the environment — a critic that
+cannot do its job must fail loudly, not silently:
+
+- `ux-critic` and `demo-recorder` are **pinned to vision-capable models**
+  in their agent files (they must analyze screenshots; the session model
+  may be text-only). If a pinned model is unavailable the launch errors —
+  do not "fix" that by rerunning the agent on the session model; fix the
+  pin or record the lens as CANNOT-RUN.
+- For user-facing items, **start the app** (dev server or equivalent) and
+  include the running URL in the ux-critic prompt. If it cannot be
+  started, say so explicitly in the prompt — ux-critic will grade from
+  code and report the unverified scope.
+- `demo-recorder` needs browser tools, `ffmpeg`, and a TTS engine
+  (`say`/`espeak`) for narrated video; it degrades explicitly and says so
+  in the walkthrough.
+
+Launch the panel members **in parallel** (background subagents), with a
+hard cap of **4 concurrent subagents** — the largest routed panel. Never
+launch additional agents while the panel is running (`pm` and
+`demo-recorder` belong to their own phases and must not overlap with it).
+If the routing table is ever extended beyond 4 members, launch in batches
+of ≤ 4 and wait for each batch to return before starting the next.
+
+Each
 delegation prompt must be self-contained and include:
 
 - The work item type, slug, and the full spec (or its path — but prefer
@@ -87,19 +112,26 @@ delegation prompt must be self-contained and include:
   lines; otherwise the stat plus the names of the files each critic should
   read.
 - The cycle number and the instruction to return the rubric report format.
+- For `ux-critic` on user-facing items: a URL where the app is already
+  running (or an explicit statement that live verification isn't possible).
 - For `implementation-grader`: how to run the test suite.
 - For `security-analyst` on CVEs: the repro receipts (fail-before) and the
   advisory/triage from the spec.
 
 ## Phase 4 — Fix loop
 
-1. Collect all reports. Triage findings: blockers and majors must be fixed;
+1. Collect all reports. A `CANNOT-RUN` verdict is neither PASS nor FAIL:
+   first try to restore the capability (start the app, fix the pinned
+   model, connect the browser). If it cannot be restored, record the lens
+   as **unverified** — it must appear in the grading summary and be named
+   in the handoff, never silently dropped.
+2. Triage findings: blockers and majors must be fixed;
    minors/nits are recorded for the report (fix them only if cheap).
-2. Fix in severity order, one commit per fix
+3. Fix in severity order, one commit per fix
    (`fix(<slug>): address <finding>`).
-3. Re-run the full panel (cycle n+1). **Cycle cap: 3.** At cycle 3 without
+4. Re-run the full panel (cycle n+1). **Cycle cap: 3.** At cycle 3 without
    exit criteria met, stop — write the report and escalate (below).
-4. Exit check (all must hold, per the rubric):
+5. Exit check (all must hold, per the rubric):
    - every acceptance criterion PASS with evidence
    - zero blockers, zero majors across all final reports
    - full suite green (receipt)
@@ -108,7 +140,9 @@ delegation prompt must be self-contained and include:
 ## Phase 5 — Demo, report, handoff
 
 1. Delegate to `demo-recorder`: include the slug, what was delivered, how
-   to run the app/tests, and where receipts live.
+   to run the app/tests, where receipts live, and which demo tier is
+   expected (narrated video when browser + TTS + ffmpeg are available;
+   otherwise it degrades explicitly).
 2. Write `deliveries/<slug>/report.md`:
 
 ```markdown
@@ -121,6 +155,7 @@ delegation prompt must be self-contained and include:
 ## Grading summary
 | Cycle | pm | implementation-grader | code-reviewer | security-analyst | ux-critic |
 Findings resolved this run; remaining minors/nits (with file:line).
+Unverified lenses (CANNOT-RUN) and why; what the human should review themselves.
 ## Receipts
 Test suite output; CVE repro fail-before/pass-after; other key commands.
 ## Rollback

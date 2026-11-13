@@ -12,10 +12,11 @@ future changes stay coherent.
 | One agent, one responsibility | Six focused roles (pm, ux-critic, implementation-grader, code-reviewer, security-analyst, demo-recorder) instead of one generalist reviewer. Findings attach to a lens, so triage is unambiguous. |
 | Ground truth over self-report | Receipts (command output, test runs) are required for every PASS and captured in the evidence bundle. The implementation-grader must run tests itself; "the builder says it works" is never evidence. |
 | Grader loop instead of human gates | The builder iterates fix → re-grade autonomously. "Done" is decided by machine-checkable exit criteria in the rubric, not by a human checkpoint. |
-| Bounded autonomy | Cycle cap (3). On cap, the run stops and escalates with exactly what's stuck. Prevents unbounded compute burn and forced "passes". |
+| Bounded autonomy | Cycle cap (3). On cap, the run stops and escalates with exactly what's stuck. Prevents unbounded compute burn and forced "passes". Concurrency cap (4 subagents — panel width) bounds parallel spend the same way. |
 | Spec-driven development | Every run starts from `deliveries/<slug>/spec.md` with testable acceptance criteria. The spec is the ground truth every grader grades against. CVEs additionally require a failing repro test before any fix. |
 | Conditional panel routing | Not every critic runs on every item (ux-critic only on user-facing work). Keeps cycles cheap without weakening coverage where it matters. |
 | Least privilege | Critics deny `edit` (and `shell`, except implementation-grader which runs tests, and demo-recorder which needs to start apps). Demo-recorder's `edit` is allow-listed to `deliveries/**`. |
+| Capability honesty | Critics declare the capabilities their lens requires and return an explicit `CANNOT-RUN` verdict (never a silent skip, never a fake pass) when one is missing. Vision-dependent agents (`ux-critic`, `demo-recorder`) are pinned to verified multimodal models; text lenses inherit the session model. |
 | Single human gate | One decision remains human: merging. The evidence bundle is designed to answer a reviewer's questions: what was asked, what changed, what was verified, how to roll back. |
 | Provenance | Per-run `deliveries/<slug>/` directory with spec, report, receipts, grader reports, demo — auditable after the fact. |
 
@@ -59,20 +60,35 @@ the permission boundary.
   judgment at the single gate.
 - Demo artifacts are real captures when possible; when the environment
   can't run the app, demo-recorder says so rather than fabricating.
+- Model capability is not uniform: text-only models cannot analyze
+  screenshots (GLM 5.3 on the current provider is confirmed non-multimodal
+  and rejects image input). Pinning vision agents makes that failure loud
+  at launch; the critics' preflight checks catch anything else (missing
+  browser, no ffmpeg/TTS) and surface it as CANNOT-RUN in the report
+  instead of a silently narrowed review.
 
 ## Extension points
 
 - **New team member**: add `.opencode/agents/<role>.md` (read-only critic
   template: load `grading-rubric`, one lens, rubric report format), then
-  add it to the routing table in `agentic-delivery/SKILL.md`.
+  add it to the routing table in `agentic-delivery/SKILL.md`. If that
+  pushes a routed panel past 4 members, the skill batches the launches —
+  keep the concurrency cap in mind before widening a panel.
 - **Auto-merge**: when trust is earned, the handoff step can open a PR and
   merge when exit criteria pass. Deliberately not enabled.
 - **CI wiring**: the panel's Phase 3 can be run by CI on every PR
   (`/grade` semantics) so human-created changes get the same grading.
 - **Tracker integration**: `/rfe`/`/cve` take text today; an intake step
   that pulls from Jira/GitHub Issues is additive (Phase 0).
-- **Per-agent models**: add `model:` frontmatter to any agent (e.g., a
-  stronger model for security-analyst) — omitted for portability.
+- **Per-agent models**: capability-critical agents are pinned via
+  `model:` frontmatter — `ux-critic` and `demo-recorder` →
+  `anthropic/claude-sonnet-5`, verified multimodal through the current
+  provider (the session default, GLM 5.3, is text-only and errors on
+  image input). Change a pin by editing the agent file, but re-verify the
+  new model can actually read images before trusting it. Text-only lenses
+  deliberately inherit the session model for portability. A missing pinned
+  model fails loudly at subagent launch — never silently degrade to an
+  incapable model.
 
 ## References
 

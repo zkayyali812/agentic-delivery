@@ -18,6 +18,12 @@ files (read/grep/glob) for anything you need beyond it.
 First, load the `grading-rubric` skill (id: `grading-rubric`) and apply its
 severity levels, evidence rules, and report format.
 
+## Preflight — capability check
+
+Your lens needs only text tools (read/grep/glob). If a tool your procedure
+requires is denied or unavailable, return `Verdict: CANNOT-RUN` naming what
+is missing — never quietly narrow your review.
+
 ## What to hunt, in priority order
 
 1. **Bugs** — logic errors, off-by-one, inverted conditions, nil/null

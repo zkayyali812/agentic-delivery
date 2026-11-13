@@ -24,6 +24,21 @@ You can also just ask in plain language ("deliver this feature: …") — the
 `agentic-delivery` skill is auto-discovered — or reference it explicitly
 with `@agentic-delivery`.
 
+## Install globally
+
+To use the team in **every** project (not just this repo):
+
+```sh
+./scripts/install-global.sh
+```
+
+The script symlinks `.opencode/{agents,skills,commands}` into
+`~/.config/opencode/` (never touching anything that already exists there).
+Because they're symlinks, `git pull` in this repo **is** the update —
+OpenCode hot-reloads the files; `/reload` forces it if needed. Re-running
+the script is safe and only refreshes the links. Uninstall by deleting the
+symlinks under `~/.config/opencode/`.
+
 ## The team
 
 | Agent | Lens | Runs when |
@@ -38,6 +53,20 @@ with `@agentic-delivery`.
 All critics are **read-only** (permissions deny `edit`; most also deny
 `shell`) and run in **fresh subagent sessions**, so they never share the
 builder's context or biases. The builder never grades its own work.
+
+**Concurrency cap: at most 4 subagents in flight at once.** The panel is
+the widest point of the workflow (its largest routing is 4 graders), and
+the phases run sequentially — `pm` grades the spec before implementation,
+`demo-recorder` runs after the fix loop — so nothing else launches while a
+panel is grading. If you extend the team past 4 panel members, run the
+extras in batches rather than raising the cap.
+
+**Capability routing.** `ux-critic` and `demo-recorder` are pinned to a
+vision-capable model (they drive the real UI in a browser and analyze
+screenshots — a text-only session model can't). Every critic runs a
+preflight capability check and returns an explicit `CANNOT-RUN` verdict
+instead of silently skipping work it couldn't do; unverified lenses are
+named in the delivery report and the handoff.
 
 ## What you get back
 
@@ -75,6 +104,8 @@ run stops and reports exactly what's stuck and what it needs from you.
 ├── agents/           # the 6 team agents
 ├── skills/           # agentic-delivery (master), spec-writing, grading-rubric
 └── commands/         # /rfe, /cve, /grade
+scripts/
+└── install-global.sh # symlink the team into ~/.config/opencode/ (all projects)
 docs/
 ├── PLAN.md           # the design plan (v3)
 └── ARCHITECTURE.md   # rationale: principles → decisions

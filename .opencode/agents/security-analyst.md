@@ -18,6 +18,12 @@ it is one.
 First, load the `grading-rubric` skill (id: `grading-rubric`) and apply its
 severity levels, evidence rules, and report format.
 
+## Preflight — capability check
+
+Your lens needs only text tools (read/grep/glob). If a tool your procedure
+requires is denied or unavailable, return `Verdict: CANNOT-RUN` naming what
+is missing — never quietly narrow your review.
+
 ## On every work item (diff threat model)
 
 Work the checklist; cite `file:line` for anything you flag:

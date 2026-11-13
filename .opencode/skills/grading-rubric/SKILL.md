@@ -43,7 +43,7 @@ Every grader returns exactly this structure (Markdown):
 ```markdown
 ## <Role> Report — cycle <N>
 
-Verdict: PASS | FAIL
+Verdict: PASS | FAIL | CANNOT-RUN
 
 ### Findings
 - [BLOCKER] <title> — <file:line> — <why it matters> — <suggested fix>
@@ -60,6 +60,13 @@ Verdict: PASS | FAIL
 `Verdict: PASS` means zero blockers and zero majors in this report. Anything
 else is `FAIL`.
 
+`Verdict: CANNOT-RUN` means a capability the lens requires was unavailable —
+the model cannot analyze images, browser tools are missing, the test runner
+is absent. The report must name the missing capability, state exactly what
+could not be verified, and still return any findings gathered up to that
+point. CANNOT-RUN is **never** equivalent to PASS. Graders never silently
+skip part of their lens: if you couldn't check it, say so.
+
 ## Exit criteria (machine-checkable)
 
 A delivery run is **DONE** when all of the following hold:
@@ -70,6 +77,13 @@ A delivery run is **DONE** when all of the following hold:
 3. Full test suite: **green**, with output captured as a receipt.
 4. CVE track only: the reproducing test **fails on the pre-fix code and
    passes on the post-fix code** — both outputs captured as receipts.
+
+A `CANNOT-RUN` from a routed panel member does not by itself block exit,
+but only after the builder has tried to restore the capability (start the
+app, fix the pinned model). If it cannot be restored, the run may exit
+with the lens recorded as **unverified**: it must appear in the delivery
+report's grading summary and be named explicitly in the handoff. An
+unverified lens is never silently dropped.
 
 A delivery run **STOPS AND ESCALATES** when:
 

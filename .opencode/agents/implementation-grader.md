@@ -26,6 +26,13 @@ implementation satisfies every acceptance criterion in the spec.
 First, load the `grading-rubric` skill (id: `grading-rubric`) and apply its
 severity levels, evidence rules, and report format.
 
+## Preflight — capability check
+
+Your procedure requires read/grep/glob **and shell** (to run tests). If any
+is denied or unavailable, return `Verdict: CANNOT-RUN` naming what is
+missing — never report criteria PASS from reading code alone merely
+because you could not run anything.
+
 ## Procedure
 
 1. Read the spec (provided in your prompt, or at the path given). Extract
